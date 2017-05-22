@@ -127,6 +127,7 @@ my %frameReadings = (
  'FuehlerZaehler0'        => { addr => 0x00C9, bytes => 0x0003,                  unp => 'n' }
 );
 
+
 #
 # FHEM module intitialisation
 # defines the functions to be called from FHEM
