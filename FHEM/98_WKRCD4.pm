@@ -1,7 +1,7 @@
 #########################################################################
-# fhem Modul für Waterkotte Wärmepumpe mit Resümat CD4 Steuerung
-# Vorlage: Modul WHR962, diverse Foreneinträge sowie Artikel über Auswertung der 
-# Wärmepumpe mit Linux / Perl im Linux Magazin aus 2010
+# fhem Modul fÃ¼r Waterkotte WÃ¤rmepumpe mit ResÃ¼mat CD4 Steuerung
+# Vorlage: Modul WHR962, diverse ForeneintrÃ¤ge sowie Artikel Ã¼ber Auswertung der 
+# WÃ¤rmepumpe mit Linux / Perl im Linux Magazin aus 2010
 # insbesondere: 
 #		http://www.haustechnikdialog.de/Forum/t/6144/Waterkotte-5017-3-an-den-Computer-anschliessen?page=2  (Speicheradressen-Liste)
 #       http://www.ip-symcon.de/forum/threads/2092-ComPort-und-Waterkotte-abfragen 							(Protokollbeschreibung)
@@ -19,14 +19,15 @@ use Time::HiRes qw(gettimeofday);
 # from the WP with the GET command
 my %WKRCD4_gets = (  
 	"Hzg-TempBasisSoll"	=> "Hzg-TempBasisSoll",
-	"WW-Temp-Soll"		=> "Temp-WW-Soll",
-	"Hzg-TempEinsatz"	=> "Hzg-TempEinsatz"
+	"Hzg-TempEinsatz"	=> "Hzg-TempEinsatz",
+        "Temp-WW-Soll"		=> "Temp-WW-Soll"
 );
 
 # list of Readings / values that can be written to the WP
 my %WKRCD4_sets = (  
 	"Hzg-TempBasisSoll"	=> "Hzg-TempBasisSoll",
-	"Hzg-TempEinsatz"	=> "Hzg-TempEinsatz"
+	"Hzg-TempEinsatz"	=> "Hzg-TempEinsatz",
+        "Temp-WW-Soll"		=> "Temp-WW-Soll"
 );
 
 # Definition of the values that can be read / written 
@@ -38,10 +39,12 @@ my %WKRCD4_sets = (
 my %frameReadings = (
  'Versions-Nummer'        => { addr => 0x0000, bytes => 0x0002,                  unp => 'n' },
  'Temp-Aussen'            => { addr => 0x0008, bytes => 0x0004, fmat => '%0.1f', unp => 'f<' },
+ 'Temp-Aussen-24h'        => { addr => 0x000C, bytes => 0x0004, fmat => '%0.1f', unp => 'f<' },
+ 'Temp-Aussen-1h'         => { addr => 0x0010, bytes => 0x0004, fmat => '%0.1f', unp => 'f<' },
  'Temp-Ruecklauf-Soll'    => { addr => 0x0014, bytes => 0x0004, fmat => '%0.1f', unp => 'f<' },
  'Temp-Ruecklauf'         => { addr => 0x0018, bytes => 0x0004, fmat => '%0.1f', unp => 'f<' },
  'Temp-Vorlauf'           => { addr => 0x001C, bytes => 0x0004, fmat => '%0.1f', unp => 'f<' },
- 'Temp-WW-Soll'           => { addr => 0x0020, bytes => 0x0004, fmat => '%0.1f', unp => 'f<' },
+ 'Temp-WW-Soll'           => { addr => 0x0020, bytes => 0x0004, fmat => '%0.1f', unp => 'f<', min => 30.0, max => 55.0 },
  'Temp-WW'                => { addr => 0x0024, bytes => 0x0004, fmat => '%0.1f', unp => 'f<' },
  'Temp-Raum'              => { addr => 0x0028, bytes => 0x0004, fmat => '%0.1f', unp => 'f<' },
  'Temp-WQuelle-Ein'       => { addr => 0x0030, bytes => 0x0004, fmat => '%0.1f', unp => 'f<' },
