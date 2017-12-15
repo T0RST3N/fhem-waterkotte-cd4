@@ -20,14 +20,20 @@ use Time::HiRes qw(gettimeofday);
 my %WKRCD4_gets = (  
 	"Hzg-TempBasisSoll"	=> "Hzg-TempBasisSoll",
 	"Hzg-TempEinsatz"	=> "Hzg-TempEinsatz",
-        "Temp-WW-Soll"		=> "Temp-WW-Soll"
+	"Ww-Zeit-Ein"		=> "Ww-Zeit-Ein",
+	"Ww-Zeit-Aus"		=> "Ww-Zeit-Aus",
+    "Temp-WW-Soll"		=> "Temp-WW-Soll",
+
 );
 
 # list of Readings / values that can be written to the WP
 my %WKRCD4_sets = (  
 	"Hzg-TempBasisSoll"	=> "Hzg-TempBasisSoll",
 	"Hzg-TempEinsatz"	=> "Hzg-TempEinsatz",
-        "Temp-WW-Soll"		=> "Temp-WW-Soll"
+	"Hzg-KlSteilheit"	=> "Hzg-KlSteilheit",
+	"Ww-Zeit-Ein"		=> "Ww-Zeit-Ein",
+	"Ww-Zeit-Aus"		=> "Ww-Zeit-Aus",
+    "Temp-WW-Soll"		=> "Temp-WW-Soll"
 );
 
 # Definition of the values that can be read / written 
@@ -56,7 +62,7 @@ my %frameReadings = (
  'Druck-Kondensator'      => { addr => 0x004C, bytes => 0x0004, fmat => '%0.1f', unp => 'f<' },
  'Hzg-TempEinsatz'        => { addr => 0x00F4, bytes => 0x0004, fmat => '%0.1f', unp => 'f<', min => 15.0, max => 20.0 },
  'Hzg-TempBasisSoll'      => { addr => 0x00F8, bytes => 0x0004, fmat => '%0.1f', unp => 'f<', min => 20.0, max => 24.0 },
- 'Hzg-KlSteilheit'        => { addr => 0x00FC, bytes => 0x0004, fmat => '%0.1f', unp => 'f<', min => 15.0, max => 30.0 },
+ 'Hzg-KlSteilheit'        => { addr => 0x00FC, bytes => 0x0004, fmat => '%0.1f', unp => 'f<', min => 15.0, max => 40.0 },
  'Hzg-KlBegrenz'          => { addr => 0x0100, bytes => 0x0004, fmat => '%0.1f', unp => 'f<' },
  'Hzg-TempRlSoll'         => { addr => 0x0050, bytes => 0x0004, fmat => '%0.1f', unp => 'f<' },
  'Hzg-TempRlIst'          => { addr => 0x0054, bytes => 0x0004, fmat => '%0.1f', unp => 'f<' },
@@ -127,6 +133,7 @@ my %frameReadings = (
  'Ausfaelle'              => { addr => 0x00C7, bytes => 0x0001,                  unp => 'B8' },
  'Fuehler-Ausfall'        => { addr => 0x00C8, bytes => 0x0001,                  unp => 'B8' },
  'Fuehler-Kurzschl'       => { addr => 0x00C9, bytes => 0x0001,                  unp => 'B8' },
+ 'Betriebszustaende'      => { addr => 0x00CE, bytes => 0x0001,                  unp => 'B8' },
  'FuehlerZaehler0'        => { addr => 0x00C9, bytes => 0x0003,                  unp => 'n' }
 );
 
