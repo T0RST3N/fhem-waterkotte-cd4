@@ -1,43 +1,44 @@
 #########################################################################
 # fhem Modul für Waterkotte Wärmepumpe mit Resümat CD4 Steuerung
-# Vorlage: Modul WHR962, diverse Foreneinträge sowie Artikel über Auswertung der 
+# Vorlage: Modul WHR962, diverse Foreneinträge sowie Artikel über Auswertung der
 # Wärmepumpe mit Linux / Perl im Linux Magazin aus 2010
-# insbesondere: 
+# insbesondere:
 #		http://www.haustechnikdialog.de/Forum/t/6144/Waterkotte-5017-3-an-den-Computer-anschliessen?page=2  (Speicheradressen-Liste)
 #       http://www.ip-symcon.de/forum/threads/2092-ComPort-und-Waterkotte-abfragen 							(Protokollbeschreibung)
 #		http://www.haustechnikdialog.de/Forum/t/6144/Waterkotte-5017-3-an-den-Computer-anschliessen?page=4 	(Beispiel Befehls-Strings)
-#	
-							
+#
+
 package main;
 
-use strict;                          
-use warnings;                        
-use Time::HiRes qw(gettimeofday);    
+use strict;
+use warnings;
+use Time::HiRes qw(gettimeofday);
 
 #
 # list of Readings / values that can explicitely be requested
 # from the WP with the GET command
-my %WKRCD4_gets = (  
+my %WKRCD4_gets = (
 	"Hzg-TempBasisSoll"	=> "Hzg-TempBasisSoll",
 	"Hzg-TempEinsatz"	=> "Hzg-TempEinsatz",
 	"Ww-Zeit-Ein"		=> "Ww-Zeit-Ein",
 	"Ww-Zeit-Aus"		=> "Ww-Zeit-Aus",
-    "Temp-WW-Soll"		=> "Temp-WW-Soll",
-
+  "Temp-WW-Soll"		=> "Temp-WW-Soll",
+  "Handabschaltung"		=> "Handabschaltung"
 );
 
 # list of Readings / values that can be written to the WP
-my %WKRCD4_sets = (  
+my %WKRCD4_sets = (
 	"Hzg-TempBasisSoll"	=> "Hzg-TempBasisSoll",
 	"Hzg-TempEinsatz"	=> "Hzg-TempEinsatz",
 	"Hzg-KlSteilheit"	=> "Hzg-KlSteilheit",
 	"Ww-Zeit-Ein"		=> "Ww-Zeit-Ein",
 	"Ww-Zeit-Aus"		=> "Ww-Zeit-Aus",
-    "Temp-WW-Soll"		=> "Temp-WW-Soll"
+  "Temp-WW-Soll"		=> "Temp-WW-Soll",
+	"Handabschaltung"		=> "Handabschaltung"
 );
 
-# Definition of the values that can be read / written 
-# with the relative address, number of bytes and 
+# Definition of the values that can be read / written
+# with the relative address, number of bytes and
 # fmat to be used in sprintfd when formatting the value
 # unp to be used in pack / unpack commands
 # min / max for setting values
@@ -60,6 +61,7 @@ my %frameReadings = (
  'Temp-Saugleitung'       => { addr => 0x0040, bytes => 0x0004, fmat => '%0.1f', unp => 'f<' },
  'Druck-Verdampfer'       => { addr => 0x0048, bytes => 0x0004, fmat => '%0.1f', unp => 'f<' },
  'Druck-Kondensator'      => { addr => 0x004C, bytes => 0x0004, fmat => '%0.1f', unp => 'f<' },
+ 'Handabschaltung'        => { addr => 0x00F3, bytes => 0x0001,                  unp => 'C',  min => 0,   max => 1 },
  'Hzg-TempEinsatz'        => { addr => 0x00F4, bytes => 0x0004, fmat => '%0.1f', unp => 'f<', min => 15.0, max => 20.0 },
  'Hzg-TempBasisSoll'      => { addr => 0x00F8, bytes => 0x0004, fmat => '%0.1f', unp => 'f<', min => 20.0, max => 24.0 },
  'Hzg-KlSteilheit'        => { addr => 0x00FC, bytes => 0x0004, fmat => '%0.1f', unp => 'f<', min => 15.0, max => 40.0 },
@@ -101,7 +103,7 @@ my %frameReadings = (
  'Display-Zeile-2'        => { addr => 0x0090, bytes => 0x0001, 				 unp => 'C' },
  'Status-Gesamt'          => { addr => 0x00D2, bytes => 0x0001, 				 unp => 'C' },
  'Status-Heizung'         => { addr => 0x00D4, bytes => 0x0003,                  unp => 'B24' },
- 'Status-Kuehlung'        => { addr => 0x00DA, bytes => 0x0003,                  unp => 'B24' }, 
+ 'Status-Kuehlung'        => { addr => 0x00DA, bytes => 0x0003,                  unp => 'B24' },
  'Mode-Heizung'           => { addr => 0x00DF, bytes => 0x0001,                  unp => 'B8' },
  'Mode-Kuehlung'          => { addr => 0x00E0, bytes => 0x0001,                  unp => 'B8' },
  'Mode-Warmwasser'        => { addr => 0x00E1, bytes => 0x0001,                  unp => 'B8' },
@@ -175,21 +177,21 @@ sub WKRCD4_Define($$)
 	my $name = $a[0];
 	my $dev  = $a[2];
 	my $interval  = 60;
-	
+
 	if ( $dev eq "none" ) {
 		Log3 undef, 1, "WKRCD4 device is none, commands will be echoed only";
 		return undef;
 	}
-	
-	if(int(@a) == 4) { 
-		$interval= $a[3]; 
+
+	if(int(@a) == 4) {
+		$interval= $a[3];
 		if ($interval < 20) {
 			return "interval too small, please use something > 20, default is 60";
 		}
 	}
 
 	$hash->{buffer} 			= "";
-	
+
 	$hash->{DeviceName} 		= $dev;
 	$hash->{INTERVAL}   		= $interval;
 
@@ -202,9 +204,9 @@ sub WKRCD4_Define($$)
 	$hash->{LastRequestLen} 	= 4;
 	$hash->{LastRequest} 	  	= gettimeofday();
 	my $ret = DevIo_OpenDev( $hash, 0, "WKRCD4_Wakeup" );
-	
+
 	# initial read after 3 secs, there timer is set to interval for update and wakeup
-	InternalTimer(gettimeofday()+3, "WKRCD4_GetUpdate", $hash, 0);	
+	InternalTimer(gettimeofday()+3, "WKRCD4_GetUpdate", $hash, 0);
 
 	return $ret;
 }
@@ -212,13 +214,13 @@ sub WKRCD4_Define($$)
 #
 # undefine command when device is deleted
 #########################################################################
-sub WKRCD4_Undef($$)    
-{                     
-	my ( $hash, $arg ) = @_;       
-	DevIo_CloseDev($hash);         
-	RemoveInternalTimer($hash);    
-	return undef;                  
-}    
+sub WKRCD4_Undef($$)
+{
+	my ( $hash, $arg ) = @_;
+	DevIo_CloseDev($hash);
+	RemoveInternalTimer($hash);
+	return undef;
+}
 
 
 #
@@ -241,13 +243,13 @@ sub WPCMD($$$$;@)
 	my ($hash, $cmd, $addr, $len, @value ) = @_;
 	my $name = $hash->{NAME};
 	my @frame = ();
-	
+
 	if ($cmd eq "read") {
-		@frame = (0x01, 0x15, Encode10($addr>>8, $addr%256), Encode10($len>>8, $len%256));	
+		@frame = (0x01, 0x15, Encode10($addr>>8, $addr%256), Encode10($len>>8, $len%256));
 	} elsif ($cmd eq "write") {
 		@frame = (0x01, 0x13, Encode10($addr>>8, $addr%256), Encode10(@value));
 	} else {
-		Log3 $name, 3, "undefined cmd ($cmd) in WPCMD"; 
+		Log3 $name, 3, "undefined cmd ($cmd) in WPCMD";
 		return 0;
 	}
 	my $crc = CRC16(@frame);
@@ -265,7 +267,7 @@ sub WKRCD4_Get($@)
 	my $name = shift @a;
 	my $attr = shift @a;
 	my $arg = join("", @a);
-	
+
 	if(!$WKRCD4_gets{$attr}) {
 		my @cList = keys %WKRCD4_gets;
 		return "Unknown argument $attr, choose one of " . join(" ", @cList);
@@ -293,10 +295,10 @@ sub WKRCD4_Get($@)
 
 	Log3 $name, 4, "Get -> Call DevIo_SimpleWrite: " . unpack ('H*', $cmd);
 	DevIo_SimpleWrite( $hash, $cmd , 0 );
-	
+
 	return sprintf ("Read %02x bytes starting from %02x", $bytes, $addr);
 }
-	
+
 #
 # SET command
 #########################################################################
@@ -308,7 +310,7 @@ sub WKRCD4_Set($@)
 	my $name = shift @a;
 	my $attr = shift @a;
 	my $arg = join("", @a);
-	
+
 	if(!defined($WKRCD4_sets{$attr})) {
 		my @cList = keys %WKRCD4_sets;
 		return "Unknown argument $attr, choose one of " . join(" ", @cList);
@@ -326,17 +328,17 @@ sub WKRCD4_Set($@)
 	my $min   = $properties->{min};
 	my $max   = $properties->{max};
 	my $unp   = $properties->{unp};
-	
+
     return "a numerical value between $min and $max is expected, got $arg instead"
         if($arg !~ m/^[\d.]+$/ || $arg < $min || $arg > $max);
-	
+
 	# convert string to value needed for command
 	my $vp 	  = pack($unp, $arg);
 	my @value = unpack ('C*', $vp);
-	
+
 	Log3 $name, 4, sprintf ("Write $attr: %02x bytes starting from %02x with %s (%s) packed with $unp", $bytes, $addr, unpack ('H*', $vp), unpack ($unp, $vp));
 	my $cmd = pack('C*', WPCMD($hash, 'write', $addr, $bytes, @value));
-	
+
 	# set internal variables to track what is happending
 	$hash->{LastRequestAdr} = $addr;
 	$hash->{LastRequestLen} = $bytes;
@@ -344,7 +346,7 @@ sub WKRCD4_Set($@)
 	$hash->{SerialRequests}++;
 	Log3 $name, 4, "Set -> Call DevIo_SimpleWrite: " . unpack ('H*', $cmd);
 	DevIo_SimpleWrite( $hash, $cmd , 0 );
-	
+
 	return sprintf ("Wrote %02x bytes starting from %02x with %s (%s)", $bytes, $addr, unpack ('H*', $vp), unpack ($unp, $vp));
 }
 
@@ -356,35 +358,35 @@ sub WKRCD4_Read($)
 {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
-	
+
 	# read from serial device
-	my $buf = DevIo_SimpleRead($hash);		
+	my $buf = DevIo_SimpleRead($hash);
 	return "" if ( !defined($buf) );
 
 	# convert to hex string to make parsing with regex easier
-	$hash->{buffer} .= unpack ('H*', $buf);	
+	$hash->{buffer} .= unpack ('H*', $buf);
 	Log3 $name, 5, "Current buffer content: " . $hash->{buffer};
 
 	# did we already get a full frame?
-	if ($hash->{buffer} =~ "ff1002(.{4})(.*)1003(.{4})ff(.*)") 
+	if ($hash->{buffer} =~ "ff1002(.{4})(.*)1003(.{4})ff(.*)")
 	{
 		my $msg   = $1;
 		my $frame = $msg . $2;
 		my $crc   = $3;
-		
+
 		Log3 $name, 4, "Match msg: " .$msg . " " . $frame . " CRC " . $crc . " Rest " . $4;
 		$hash->{buffer} = $4;
 
 		# convert frame contents to byte array
 		my @aframe = unpack ('C*', pack ('H*', $frame));
-		
-		# calculate CRC and compare with CRC from read 
+
+		# calculate CRC and compare with CRC from read
 		my $crc2 = sprintf("%04x",CRC16(@aframe));
-		if ($crc eq $crc2) 
+		if ($crc eq $crc2)
 		{
 			Log3 $name, 4, "CRC Ok.";
 			$hash->{SerialGoodReads}++;
-			
+
 			# reply to read request ?
 			if ($msg eq "0017") {
 				my @data;
@@ -393,16 +395,16 @@ sub WKRCD4_Read($)
 					# remove duplicate 0x10 (frames are encoded like this)
 					if (($aframe[$offset]==16)&&($aframe[$offset+1]==16)) { $offset++; }
 					$data[$i] = $aframe[$offset];
-				}	
+				}
 				Log3 $name, 4, "Parse with relative request start " . $hash->{LastRequestAdr} . " Len " . $hash->{LastRequestLen};
 				# extract values from data
-				parseReadings($hash, @data);			
+				parseReadings($hash, @data);
 			} elsif ($msg eq "0011") {
 				# reply to write
 			} else {
 				Log3 $name, 3, "Unknown Msg type " . $msg . " in " . $hash->{buffer};
 			}
-		} else 
+		} else
 		{
 			Log3 $name, 3, "Bad CRC from WP: " . $crc . " berechnet: " . $crc2 . " Frame ". $frame;
 			$hash->{SerialBadReads} ++;
@@ -437,17 +439,17 @@ sub WKRCD4_Wakeup($)
 {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
-	
+
 	$hash->{SerialRequests}++;
-	
+
 	$hash->{LastRequestAdr} = 8;
 	$hash->{LastRequestLen} = 4;
 	$hash->{LastRequest}  	= gettimeofday();
-	
+
 	my $cmd = "41540D100201150008000410037EA010020115003000041003FDC3100201150034000410037D90";
 	DevIo_SimpleWrite( $hash, $cmd , 1 );
-	
-	Log3 $name, 5, "sent wakeup string: " . $cmd . " done."; 
+
+	Log3 $name, 5, "sent wakeup string: " . $cmd . " done.";
 	return undef;
 }
 
@@ -458,20 +460,20 @@ sub WKRCD4_GetUpdate($)
 {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
-	
+
 	InternalTimer(gettimeofday()+$hash->{INTERVAL}, "WKRCD4_GetUpdate", $hash, 1);
 	InternalTimer(gettimeofday()+$hash->{INTERVAL}/2, "WKRCD4_Wakeup", $hash, 1);
 
 	$hash->{SerialRequests}++;
-	
+
 	my $cmd = pack('C*', WPCMD($hash, 'read', 0, 0x170));
 	$hash->{LastRequestAdr} = 0;
 	$hash->{LastRequestLen} = 0x170;
 	$hash->{LastRequest}  	= gettimeofday();
 	DevIo_SimpleWrite( $hash, $cmd , 0 );
-	
+
 	Log3 $name, 5, "GetUpdate -> Call DevIo_SimpleWrite: " . unpack ('H*', $cmd);
-	
+
 	return 1;
 }
 
@@ -502,10 +504,10 @@ sub parseReadings
 {
     my ($hash, @data) = @_;
   	my $name = $hash->{NAME};
-  
+
 	my $reqStart = $hash->{LastRequestAdr};
 	my $reqLen	 = $hash->{LastRequestLen};
-    
+
 	# get enough bytes?
     if (@data >= $reqLen)
     {
@@ -515,22 +517,22 @@ sub parseReadings
         {
 			my $addr  = $property->{addr};
 			my $bytes = $property->{bytes};
-			
+
 			# is reading inside data we got?
-            if (($addr >= $reqStart) && 
+            if (($addr >= $reqStart) &&
 			    ($addr + $bytes <= $reqStart + $reqLen))
             {
 				my $Idx = $addr - $reqStart;
 				# get relevant slice from data array
 				my @slice = @data[$Idx .. $Idx + $bytes - 1];
-				
+
 				# convert according to rules in global hash or defaults
 				my $pack   = ($property->{pack}) ? $property->{pack} : 'C*';
 				my $unpack = ($property->{unp})  ? $property->{unp}  : 'H*';
 				my $fmat   = ($property->{fmat}) ? $property->{fmat} : '%s';
 				#my $value = sprintf ($fmat, unpack ($unpack, pack ($pack, @slice))) . " packed with $pack, unpacked with $unpack, (hex " . unpack ('H*', pack ('C*', @slice)) . ") format $fmat";
 				my $value = sprintf ($fmat, unpack ($unpack, pack ($pack, @slice)));
-				
+
 				readingsBulkUpdate( $hash, $reading, $value );
 				Log3 $name, 4, "parse set reading $reading to $value" if (@data <= 20);
             }
